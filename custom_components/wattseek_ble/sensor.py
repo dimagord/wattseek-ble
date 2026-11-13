@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -46,6 +47,7 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
             device_class=reg.device_class,
             state_class=reg.state_class,
             suggested_display_precision=precision,
+            entity_category=EntityCategory.DIAGNOSTIC if reg.diagnostic else None,
         )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, address)},
