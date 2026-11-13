@@ -4,7 +4,9 @@
       "user": {
         "title": "WattSeek BLE",
         "description": "Оберіть логер WattSeek для додавання.",
-        "data": { "address": "Пристрій" }
+        "data": {
+          "address": "Пристрій"
+        }
       },
       "confirm": {
         "title": "WattSeek BLE",
@@ -20,8 +22,12 @@
     "step": {
       "init": {
         "title": "Налаштування WattSeek BLE",
-        "data": { "update_interval": "Інтервал оновлення (секунди)" }
+        "data": {
+          "update_interval": "Інтервал оновлення (секунди)",
+          "allow_writes": "Дозволити зміну налаштувань інвертора"
+        }
       }
     }
-  }
+  },
+  "exceptions": {}
 }

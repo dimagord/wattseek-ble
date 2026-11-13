@@ -81,3 +81,17 @@ function and parameter codes, register map).
 This project is unofficial and not affiliated with WattSeek, CVTE or JSD Solar.
 Use at your own risk; writing settings to an inverter can be dangerous, so this
 integration is **read-only**.
+
+## Controls
+
+Writable settings are exposed as `select`/`number` entities (category *Configuration*):
+output priority, operating mode (APP/UPS/GEN), charging priority, AC charging current,
+battery constant-voltage setpoint (48–58.4 V), grid low/high voltage points
+(ranges follow the input mode, per the inverter manual).
+
+Writing is **off by default**. Enable *Allow changing inverter settings* in the
+integration options once you have checked that the values shown match the inverter
+display/app.
+
+Deliberately not exposed: output voltage/frequency, battery type, grid-tie feed-in,
+factory reset.

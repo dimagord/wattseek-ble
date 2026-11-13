@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import CONF_ALLOW_WRITES, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL, DOMAIN
 from .device import WattSeekBLEDevice, WattSeekBLEError
 from .registers import READ_BLOCKS
 from .settings import SETTINGS_BLOCKS
@@ -71,6 +71,11 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
 
     async def async_write_setting(self, addr: int, value: int) -> None:
         """Write one settings register, then refresh."""
+        if not self.entry.options.get(CONF_ALLOW_WRITES, False):
+            raise HomeAssistantError(
+                "Changing inverter settings is disabled. Enable "
+                "'Allow changing inverter settings' in the WattSeek BLE options."
+            )
         self._refresh_ble_device()
         try:
             await self.device.connect()

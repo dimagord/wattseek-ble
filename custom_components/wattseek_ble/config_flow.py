@@ -21,6 +21,7 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     CONF_ADDRESS,
     CONF_UPDATE_INTERVAL,
+    CONF_ALLOW_WRITES,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     MAX_UPDATE_INTERVAL,
@@ -122,7 +123,11 @@ class WattSeekOptionsFlow(OptionsFlow):
                     ): vol.All(
                         cv.positive_int,
                         vol.Range(min=MIN_UPDATE_INTERVAL, max=MAX_UPDATE_INTERVAL),
-                    )
+                    ),
+                    vol.Required(
+                        CONF_ALLOW_WRITES,
+                        default=self.config_entry.options.get(CONF_ALLOW_WRITES, False),
+                    ): bool,
                 }
             ),
         )

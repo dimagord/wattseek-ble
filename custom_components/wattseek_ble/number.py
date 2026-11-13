@@ -5,13 +5,14 @@ from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
-from .settings import NUMBERS, NumberSetting
+from .settings import MODE_UPS, NUMBERS, OPERATING_MODE_ADDR, UPS_RANGES, NumberSetting
 
 
 async def async_setup_entry(
@@ -47,6 +48,20 @@ class WattSeekNumber(CoordinatorEntity[WattSeekCoordinator], NumberEntity):
             model="Hybrid Inverter (BLE local)",
         )
 
+    def _range(self) -> tuple[float, float]:
+        data = self.coordinator.data or {}
+        if data.get(OPERATING_MODE_ADDR) == MODE_UPS and self._setting.key in UPS_RANGES:
+            return UPS_RANGES[self._setting.key]
+        return self._setting.min_value, self._setting.max_value
+
+    @property
+    def native_min_value(self) -> float:
+        return self._range()[0]
+
+    @property
+    def native_max_value(self) -> float:
+        return self._range()[1]
+
     @property
     def native_value(self) -> float | None:
         if self.coordinator.data is None:
@@ -57,5 +72,10 @@ class WattSeekNumber(CoordinatorEntity[WattSeekCoordinator], NumberEntity):
         return round(raw * self._setting.scale, 2)
 
     async def async_set_native_value(self, value: float) -> None:
+        lo, hi = self._range()
+        if not lo <= value <= hi:
+            raise ServiceValidationError(
+                f"{self._setting.name}: {value} is outside the allowed range {lo}-{hi}"
+            )
         raw = round(value / self._setting.scale)
         await self.coordinator.async_write_setting(self._setting.address, raw)

@@ -4,7 +4,9 @@
       "user": {
         "title": "WattSeek BLE",
         "description": "Select the WattSeek logger to add.",
-        "data": { "address": "Device" }
+        "data": {
+          "address": "Device"
+        }
       },
       "confirm": {
         "title": "WattSeek BLE",
@@ -20,8 +22,12 @@
     "step": {
       "init": {
         "title": "WattSeek BLE options",
-        "data": { "update_interval": "Update interval (seconds)" }
+        "data": {
+          "update_interval": "Update interval (seconds)",
+          "allow_writes": "Allow changing inverter settings"
+        }
       }
     }
-  }
+  },
+  "exceptions": {}
 }

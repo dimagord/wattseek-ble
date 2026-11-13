@@ -50,6 +50,7 @@ INVERTER_MODBUS_ID: Final = 0x01
 # --- Config entry options -------------------------------------------------
 CONF_ADDRESS: Final = "address"
 CONF_UPDATE_INTERVAL: Final = "update_interval"
+CONF_ALLOW_WRITES: Final = "allow_writes"
 DEFAULT_UPDATE_INTERVAL: Final = 30
 MIN_UPDATE_INTERVAL: Final = 5
 MAX_UPDATE_INTERVAL: Final = 600
