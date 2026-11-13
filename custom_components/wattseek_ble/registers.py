@@ -94,6 +94,8 @@ REGISTERS: tuple[Reg, ...] = (
     Reg("pv_total_voltage", "PV Total Voltage", 0x0260, 0.1, False, _VV, _V),
     Reg("pv_total_power", "PV Total Power", 0x0263, 1, True, _W, _P),
     _energy("pv_energy_today_total", "PV Energy Today (all strings)", 0x0267),
+    _energy("pv_energy_month_total", "PV Energy Month (all strings)", 0x0269),
+    _energy("pv_energy_year_total", "PV Energy Year (all strings)", 0x026B),
     _energy("pv_energy_total_all", "PV Energy Total (all strings)", 0x026D),
     # --- Output -----------------------------------------------------------
     Reg("output_voltage", "Output Voltage", 0x0218, 0.1, False, _VV, _V),
@@ -102,11 +104,17 @@ REGISTERS: tuple[Reg, ...] = (
     Reg("output_power", "Output Active Power", 0x021C, 1, True, _W, _P),
     Reg("output_percentage", "Output Load Percentage", 0x0220, 0.1, False, PERCENTAGE, None),
     _energy("output_energy_today", "Output Energy Today", 0x0221),
+    _energy("output_energy_month", "Output Energy Month", 0x0223),
+    _energy("output_energy_year", "Output Energy Year", 0x0225),
     _energy("output_energy_total", "Output Energy Total", 0x0227),
     # --- Grid energy counters --------------------------------------------
     _energy("grid_feed_in_today", "Grid Feed-in Today", 0x01B7),
+    _energy("grid_feed_in_month", "Grid Feed-in Month", 0x01B9),
+    _energy("grid_feed_in_year", "Grid Feed-in Year", 0x01BB),
     _energy("grid_feed_in_total", "Grid Feed-in Total", 0x01BD),
     _energy("grid_consumption_today", "Grid Consumption Today", 0x01BF),
+    _energy("grid_consumption_month", "Grid Consumption Month", 0x01C1),
+    _energy("grid_consumption_year", "Grid Consumption Year", 0x01C3),
     _energy("grid_consumption_total", "Grid Consumption Total", 0x01C5),
     # --- Temperatures -----------------------------------------------------
     Reg("pv_temperature", "PV Temperature", 0x0330, 0.1, True, _C, _T),

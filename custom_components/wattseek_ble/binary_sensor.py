@@ -51,6 +51,11 @@ def _battery_charging(data: dict[int, int]) -> bool | None:
 
 BINARY_SENSORS: tuple[WSBinary, ...] = (
     WSBinary(
+        key="inverter_online",
+        name="Inverter Online",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    ),
+    WSBinary(
         key="grid_connected",
         name="Grid Connected",
         device_class=BinarySensorDeviceClass.POWER,
@@ -102,10 +107,15 @@ class WattSeekBinarySensor(CoordinatorEntity[WattSeekCoordinator], BinarySensorE
 
     @property
     def is_on(self) -> bool | None:
+        # Connectivity: reflects whether the last poll reached the inverter.
+        if self.entity_description.key == "inverter_online":
+            return self.coordinator.last_update_success
         if self.coordinator.data is None:
             return None
         return self.entity_description.is_on(self.coordinator.data)
 
     @property
     def available(self) -> bool:
+        if self.entity_description.key == "inverter_online":
+            return True  # the connectivity sensor is always meaningful
         return super().available and self.is_on is not None
