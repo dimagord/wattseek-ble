@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "WattSeek BLE",
+        "description": "Select the WattSeek logger to add.",
+        "data": { "address": "Device" }
+      },
+      "confirm": {
+        "title": "WattSeek BLE",
+        "description": "Add this WattSeek logger?"
+      }
+    },
+    "abort": {
+      "no_devices_found": "No WattSeek loggers found nearby. Make sure the inverter is powered and the WattSeek app is not connected to it.",
+      "already_configured": "This logger is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WattSeek BLE options",
+        "data": { "update_interval": "Update interval (seconds)" }
+      }
+    }
+  }
+}

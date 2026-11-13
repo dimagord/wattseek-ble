@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "WattSeek BLE",
+        "description": "Оберіть логер WattSeek для додавання.",
+        "data": { "address": "Пристрій" }
+      },
+      "confirm": {
+        "title": "WattSeek BLE",
+        "description": "Додати цей логер WattSeek?"
+      }
+    },
+    "abort": {
+      "no_devices_found": "Поблизу не знайдено логерів WattSeek. Переконайтеся, що інвертор увімкнено, а застосунок WattSeek не під'єднаний до нього по Bluetooth.",
+      "already_configured": "Цей логер вже налаштовано."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Налаштування WattSeek BLE",
+        "data": { "update_interval": "Інтервал оновлення (секунди)" }
+      }
+    }
+  }
+}
