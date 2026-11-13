@@ -33,12 +33,19 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._reg = reg
         self._attr_unique_id = f"{address}_{reg.key}"
+        # Derive display precision from the register scale (0.1 -> 1, 0.01 -> 2,
+        # 1 -> 0) so values show consistently, e.g. "56.0 V" rather than "56 V".
+        if reg.scale >= 1:
+            precision = 0
+        else:
+            precision = len(f"{reg.scale:f}".rstrip("0").split(".")[1])
         self.entity_description = SensorEntityDescription(
             key=reg.key,
             name=reg.name,
             native_unit_of_measurement=reg.unit,
             device_class=reg.device_class,
             state_class=reg.state_class,
+            suggested_display_precision=precision,
         )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, address)},
