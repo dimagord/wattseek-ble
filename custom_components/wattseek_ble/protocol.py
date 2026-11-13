@@ -178,6 +178,7 @@ def modbus_parse_holding(resp: bytes, slave: int) -> list[int]:
 # [byte_count][data].
 REQUEST_ID = b"000000000"  # 9 bytes; requests always use this literal id
 _SEQ = b"\x6c\x6c"
+_SEQ_WRITE = b"\x6c\x7f"
 _RESP_HEADER = 14  # 9 id + 0x1a 0x55 + type + 2 seq
 
 
@@ -193,6 +194,19 @@ class AppSession:
         c = count.to_bytes(2, "big")
         crc = crc16_modbus(b"\x01\x03" + a + c).to_bytes(2, "little")
         inner = REQUEST_ID + bytes([0x69, 0x55, 0x43]) + _SEQ + a + c + crc
+        return build_frame(FC_TRANSPARENT, inner)
+
+    def transparent_write(self, addr: int, value: int) -> bytes:
+        """Build a TRANSPARENT single-register write (Modbus function 0x10).
+
+        The app sends the compact body addr+count+bytecount+data+crc, where the
+        CRC is the Modbus CRC of the full `01 10 ...` request; the logger re-adds
+        the 01 10 and relays it to the inverter. Validated byte-for-byte against
+        captured app writes (type byte 0x40 for single-register writes).
+        """
+        body = addr.to_bytes(2, "big") + b"\x00\x01\x02" + (value & 0xFFFF).to_bytes(2, "big")
+        crc = crc16_modbus(b"\x01\x10" + body).to_bytes(2, "little")
+        inner = REQUEST_ID + bytes([0x69, 0x55, 0x40]) + _SEQ_WRITE + body + crc
         return build_frame(FC_TRANSPARENT, inner)
 
     def query(self, param_code: int) -> bytes:

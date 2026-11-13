@@ -168,3 +168,11 @@ class WattSeekBLEDevice:
             return parse_transparent_registers(frame.payload)
         except ProtocolError as err:
             raise WattSeekBLEError(str(err)) from err
+
+    async def async_write_register(self, addr: int, value: int) -> None:
+        """Write a single inverter holding register over the TRANSPARENT tunnel."""
+        from .const import FC_TRANSPARENT
+
+        await self._command(
+            self._session.transparent_write(addr, value), expect_fc=FC_TRANSPARENT
+        )
