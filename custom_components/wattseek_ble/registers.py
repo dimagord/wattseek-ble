@@ -53,7 +53,7 @@ REGISTERS: tuple[Reg, ...] = (
     # Battery
     Reg("battery_voltage", "Battery Voltage", 0x0080, 0.1, False, UnitOfElectricPotential.VOLT, _V),
     Reg("battery_current", "Battery Current", 0x0081, 0.1, True, UnitOfElectricCurrent.AMPERE, _A),
-    Reg("battery_soc", "Battery SOC", 0x0084, 0.1, False, PERCENTAGE, _B),
+    Reg("battery_soc", "Battery SOC", 0x0084, 1, False, PERCENTAGE, _B),
     Reg("battery_power", "Battery Power", 0x0085, 1, True, UnitOfPower.WATT, _P),
     # BMS
     Reg("bms_voltage", "BMS Voltage", 0x0088, 0.1, False, UnitOfElectricPotential.VOLT, _V),
@@ -84,10 +84,15 @@ READ_BLOCKS: tuple[tuple[int, int], ...] = (
 )
 
 
+# Value the inverter returns for a register it has no data for (e.g. BMS
+# fields when no smart battery is wired to the BMS port).
+SENTINELS = (0x7FFF, 0xFFFF)
+
+
 def decode(reg: Reg, words: dict[int, int]) -> float | None:
     """Decode one register's engineering value from a {address: word} map."""
     raw = words.get(reg.address)
-    if raw is None:
+    if raw is None or raw in SENTINELS:
         return None
     if reg.signed and raw >= 0x8000:
         raw -= 0x10000

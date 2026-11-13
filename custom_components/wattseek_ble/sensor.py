@@ -58,5 +58,5 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
         return (
             super().available
             and self.coordinator.data is not None
-            and self._reg.address in self.coordinator.data
+            and self.native_value is not None
         )
