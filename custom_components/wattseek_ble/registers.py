@@ -64,7 +64,8 @@ REGISTERS: tuple[Reg, ...] = (
     Reg("grid_voltage", "Grid Voltage", 0x0050, 0.1, False, _VV, _V),
     Reg("grid_current", "Grid Current", 0x0051, 0.01, False, _AA, _A),
     Reg("grid_frequency", "Grid Frequency", 0x0052, 0.01, False, _HZ, _F),
-    Reg("grid_power", "Grid Power", 0x0053, 1, True, _W, _P),
+    # Inverter reports import as negative; flip so import > 0 (HA convention).
+    Reg("grid_power", "Grid Power", 0x0053, -1, True, _W, _P),
     # --- Load -------------------------------------------------------------
     Reg("load_voltage", "Load Voltage", 0x0058, 0.1, False, _VV, _V),
     Reg("load_current", "Load Current", 0x0059, 0.01, False, _AA, _A),
