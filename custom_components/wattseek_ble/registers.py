@@ -118,14 +118,14 @@ REGISTERS: tuple[Reg, ...] = (
     _energy("grid_consumption_year", "Grid Consumption Year", 0x01C3),
     _energy("grid_consumption_total", "Grid Consumption Total", 0x01C5),
     # --- Temperatures -----------------------------------------------------
-    Reg("pv_temperature", "PV Temperature", 0x0330, 0.1, True, _C, _T),
-    Reg("inverter_temperature", "Inverter Temperature", 0x0331, 0.1, True, _C, _T),
-    Reg("charger_temperature", "Charger Temperature", 0x0332, 0.1, True, _C, _T),
-    Reg("charger2_temperature", "Charger 2 Temperature", 0x0333, 0.1, True, _C, _T),
-    Reg("ambient_temperature", "Ambient Temperature", 0x0334, 0.1, True, _C, _T),
-    Reg("discharge_temperature", "Discharge Temperature", 0x0335, 0.1, True, _C, _T),
+    Reg("pv_temperature", "PV Temperature", 0x0330, 0.1, True, _C, _T, diagnostic=True),
+    Reg("inverter_temperature", "Inverter Temperature", 0x0331, 0.1, True, _C, _T, diagnostic=True),
+    Reg("charger_temperature", "Charger Temperature", 0x0332, 0.1, True, _C, _T, diagnostic=True),
+    Reg("charger2_temperature", "Charger 2 Temperature", 0x0333, 0.1, True, _C, _T, diagnostic=True),
+    Reg("ambient_temperature", "Ambient Temperature", 0x0334, 0.1, True, _C, _T, diagnostic=True),
+    Reg("discharge_temperature", "Discharge Temperature", 0x0335, 0.1, True, _C, _T, diagnostic=True),
     # --- Cooling -------------------------------------------------------------
-    Reg("fan_speed", "Fan Speed", 0x0320, 1, False, PERCENTAGE, None),
+    Reg("fan_speed", "Fan Speed", 0x0320, 1, False, PERCENTAGE, None, diagnostic=True),
     # --- Diagnostics (raw codes) -----------------------------------------
     Reg("inverter_state", "Inverter State", 0x0042, 1, False, None, None, diagnostic=True),
     Reg("fault_code", "Fault Code", 0x0046, 1, False, None, None, diagnostic=True),
