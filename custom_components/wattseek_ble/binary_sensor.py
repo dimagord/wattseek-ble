@@ -60,10 +60,12 @@ def _problem(data: dict[int, int]) -> bool | None:
 
 
 def _fan_stalled(data: dict[int, int]) -> bool | None:
-    raw = data.get(0x0321)  # non-zero = fan stalled (protocol "Fan status")
-    if raw is None or raw == 0xFFFF:
+    # Alarm code 1 (0x0048) BIT08 "Fan stalled". Register 0x0321 ("fan status")
+    # is non-zero whenever the fan is simply switched off, so it can't be used.
+    raw = data.get(0x0048)
+    if raw is None:
         return None
-    return raw != 0
+    return bool(raw & (1 << 8))
 
 
 BINARY_SENSORS: tuple[WSBinary, ...] = (
