@@ -58,6 +58,13 @@ def _problem(data: dict[int, int]) -> bool | None:
     return bool(faults or alarms) or data.get(STATE_ADDR) == 7
 
 
+def _fan_stalled(data: dict[int, int]) -> bool | None:
+    raw = data.get(0x0321)  # non-zero = fan stalled (protocol "Fan status")
+    if raw is None or raw == 0xFFFF:
+        return None
+    return raw != 0
+
+
 BINARY_SENSORS: tuple[WSBinary, ...] = (
     WSBinary(
         key="inverter_online",
@@ -69,6 +76,12 @@ BINARY_SENSORS: tuple[WSBinary, ...] = (
         translation_key="problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on=_problem,
+    ),
+    WSBinary(
+        key="fan_stalled",
+        translation_key="fan_stalled",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        is_on=_fan_stalled,
     ),
     WSBinary(
         key="grid_connected",

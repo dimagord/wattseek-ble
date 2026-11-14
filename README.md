@@ -87,7 +87,8 @@ Copy `custom_components/wattseek_ble/` into `config/custom_components/` and rest
 | Battery | voltage, current, power (negative = charging), SOC; BMS values when a BMS link exists |
 | PV | per-string voltage/current/power, total PV power |
 | Energy | output, grid consumption, grid feed-in and PV — today / month / year / total |
-| Temperatures | inverter, charger, PV, ambient |
+| Temperatures | inverter, charger, charger 2, discharge, PV, ambient |
+| Cooling | fan speed (%), fan stalled (problem) |
 
 </details>
 

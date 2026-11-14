@@ -67,6 +67,9 @@
     "binary_sensor": {
       "problem": {
         "name": "Problem"
+      },
+      "fan_stalled": {
+        "name": "Fan Stalled"
       }
     },
     "switch": {

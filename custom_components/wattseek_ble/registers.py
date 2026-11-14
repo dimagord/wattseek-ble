@@ -121,7 +121,11 @@ REGISTERS: tuple[Reg, ...] = (
     Reg("pv_temperature", "PV Temperature", 0x0330, 0.1, True, _C, _T),
     Reg("inverter_temperature", "Inverter Temperature", 0x0331, 0.1, True, _C, _T),
     Reg("charger_temperature", "Charger Temperature", 0x0332, 0.1, True, _C, _T),
+    Reg("charger2_temperature", "Charger 2 Temperature", 0x0333, 0.1, True, _C, _T),
     Reg("ambient_temperature", "Ambient Temperature", 0x0334, 0.1, True, _C, _T),
+    Reg("discharge_temperature", "Discharge Temperature", 0x0335, 0.1, True, _C, _T),
+    # --- Cooling -------------------------------------------------------------
+    Reg("fan_speed", "Fan Speed", 0x0320, 1, False, PERCENTAGE, None),
     # --- Diagnostics (raw codes) -----------------------------------------
     Reg("inverter_state", "Inverter State", 0x0042, 1, False, None, None, diagnostic=True),
     Reg("fault_code", "Fault Code", 0x0046, 1, False, None, None, diagnostic=True),
@@ -137,7 +141,8 @@ READ_BLOCKS: tuple[tuple[int, int], ...] = (
     (0x01B7, 0x10),  # grid feed-in / consumption counters
     (0x0218, 0x10),  # output + output energy
     (0x0260, 0x0F),  # pv totals + pv energy counters
-    (0x0330, 0x05),  # temperatures
+    (0x0330, 0x06),  # temperatures
+    (0x0320, 0x02),  # fan speed + fan status
     (0x0176, 0x01),  # charging stage
 )
 
