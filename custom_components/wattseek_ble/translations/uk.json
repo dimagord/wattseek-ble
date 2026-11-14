@@ -53,6 +53,15 @@
       },
       "alarms": {
         "name": "Попередження"
+      },
+      "charging_stage": {
+        "name": "Етап заряду",
+        "state": {
+          "not_charging": "Не заряджається",
+          "constant_voltage": "Основний заряд (CV)",
+          "float": "Підтримувальний (float)",
+          "equalize": "Вирівнювальний"
+        }
       }
     },
     "binary_sensor": {

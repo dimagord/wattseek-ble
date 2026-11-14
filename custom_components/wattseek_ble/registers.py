@@ -138,6 +138,7 @@ READ_BLOCKS: tuple[tuple[int, int], ...] = (
     (0x0218, 0x10),  # output + output energy
     (0x0260, 0x0F),  # pv totals + pv energy counters
     (0x0330, 0x05),  # temperatures
+    (0x0176, 0x01),  # charging stage
 )
 
 # Value a 16-bit register carries when the inverter has no data for it.

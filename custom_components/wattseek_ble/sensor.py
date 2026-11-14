@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
 from .registers import REGISTERS, Reg, decode
-from .status import ALARM_SPEC, FAULT_SPEC, STATE_ADDR, STATE_ICONS, STATES, active_bits, localize
+from .status import CHARGE_STAGE_ADDR, CHARGE_STAGE_ICONS, CHARGE_STAGES, ALARM_SPEC, FAULT_SPEC, STATE_ADDR, STATE_ICONS, STATES, active_bits, localize
 
 
 async def async_setup_entry(
@@ -29,6 +29,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [WattSeekSensor(coordinator, address, reg) for reg in REGISTERS]
     entities += [
         WattSeekStatusSensor(coordinator, address),
+        WattSeekChargeStageSensor(coordinator, address),
         WattSeekBitsSensor(coordinator, address, "active_faults", "faults", FAULT_SPEC, "mdi:alert-octagon"),
         WattSeekBitsSensor(coordinator, address, "active_alarms", "alarms", ALARM_SPEC, "mdi:alert"),
     ]
@@ -65,6 +66,29 @@ class WattSeekStatusSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity)
     @property
     def icon(self) -> str:
         return STATE_ICONS.get(self.native_value or "", "mdi:state-machine")
+
+
+class WattSeekChargeStageSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
+    """Battery charging stage (register 0x0176)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "charging_stage"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(CHARGE_STAGES.values())
+
+    def __init__(self, coordinator: WattSeekCoordinator, address: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{address}_charging_stage"
+        self._attr_device_info = _device_info(address)
+
+    @property
+    def native_value(self) -> str | None:
+        raw = (self.coordinator.data or {}).get(CHARGE_STAGE_ADDR)
+        return CHARGE_STAGES.get(raw) if raw is not None else None
+
+    @property
+    def icon(self) -> str:
+        return CHARGE_STAGE_ICONS.get(self.native_value or "", "mdi:battery-unknown")
 
 
 class WattSeekBitsSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):

@@ -23,6 +23,16 @@ STATES: dict[int, str] = {
     10: "upgrade",
 }
 
+# 0x0176 "Charging status": 0 none, 1 constant voltage/current, 2 float, 3 equalize
+CHARGE_STAGE_ADDR = 0x0176
+CHARGE_STAGES: dict[int, str] = {0: "not_charging", 1: "constant_voltage", 2: "float", 3: "equalize"}
+CHARGE_STAGE_ICONS: dict[str, str] = {
+    "not_charging": "mdi:battery-outline",
+    "constant_voltage": "mdi:battery-charging-high",
+    "float": "mdi:battery-check",
+    "equalize": "mdi:battery-sync",
+}
+
 STATE_ICONS: dict[str, str] = {
     "power_on": "mdi:power",
     "initialization": "mdi:progress-clock",

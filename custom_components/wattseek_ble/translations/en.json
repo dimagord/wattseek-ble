@@ -53,6 +53,15 @@
       },
       "alarms": {
         "name": "Warnings"
+      },
+      "charging_stage": {
+        "name": "Charging Stage",
+        "state": {
+          "not_charging": "Not charging",
+          "constant_voltage": "Constant voltage",
+          "float": "Float",
+          "equalize": "Equalize"
+        }
       }
     },
     "binary_sensor": {
