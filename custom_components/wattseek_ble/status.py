@@ -8,18 +8,33 @@ STATE_ADDR = 0x0042
 FAULT1_ADDR, FAULT2_ADDR = 0x0046, 0x0047
 ALARM1_ADDR, ALARM2_ADDR = 0x0048, 0x0049
 
+# state value -> translation key (names live in translations/*.json)
 STATES: dict[int, str] = {
-    0: "Power on",
-    1: "Initialization",
-    2: "Standby",
-    3: "Grid (AC) mode",
-    4: "Solar mode",
-    5: "Battery mode",
-    6: "Generator mode",
-    7: "Fault",
-    8: "Power off",
-    9: "Factory mode",
-    10: "Firmware upgrade",
+    0: "power_on",
+    1: "initialization",
+    2: "standby",
+    3: "grid_mode",
+    4: "solar_mode",
+    5: "battery_mode",
+    6: "generator_mode",
+    7: "fault",
+    8: "power_off",
+    9: "factory_mode",
+    10: "upgrade",
+}
+
+STATE_ICONS: dict[str, str] = {
+    "power_on": "mdi:power",
+    "initialization": "mdi:progress-clock",
+    "standby": "mdi:power-sleep",
+    "grid_mode": "mdi:transmission-tower",
+    "solar_mode": "mdi:solar-power",
+    "battery_mode": "mdi:home-battery",
+    "generator_mode": "mdi:engine",
+    "fault": "mdi:alert-circle",
+    "power_off": "mdi:power-off",
+    "factory_mode": "mdi:factory",
+    "upgrade": "mdi:update",
 }
 
 FAULT1 = (
@@ -69,3 +84,66 @@ def active_bits(words: dict[int, int], spec: tuple[tuple[int, tuple], ...]) -> l
 
 FAULT_SPEC = ((FAULT1_ADDR, FAULT1), (FAULT2_ADDR, FAULT2))
 ALARM_SPEC = ((ALARM1_ADDR, ALARM1), (ALARM2_ADDR, ALARM2))
+
+
+UK: dict[str, str] = {
+    "Mains soft start failure": "Збій плавного пуску від мережі",
+    "Bus overvoltage": "Перенапруга шини DC",
+    "Bus undervoltage": "Низька напруга шини DC",
+    "Battery overcurrent": "Перевищення струму батареї",
+    "Overtemperature": "Перегрів",
+    "Battery overvoltage": "Перенапруга батареї",
+    "Battery soft start failure": "Збій плавного пуску батареї",
+    "Bus short circuit": "Коротке замикання шини DC",
+    "Inverter soft start failure": "Збій плавного пуску інвертора",
+    "Inverter overvoltage": "Перенапруга на виході інвертора",
+    "Inverter undervoltage": "Низька напруга на виході інвертора",
+    "Inverter short circuit": "Коротке замикання на виході",
+    "Negative power protection": "Захист від зворотної потужності",
+    "Overload failure": "Аварія через перевантаження",
+    "Model/hardware incompatibility": "Несумісність моделі та заліза",
+    "No bootloader": "Відсутній завантажувач",
+    "Programming in progress": "Іде прошивка",
+    "PV reverse connection": "Переплутана полярність PV",
+    "Parallel serial number abnormal": "Паралель: помилка серійного номера",
+    "Parallel communication abnormal": "Паралель: збій зв'язку",
+    "Parallel battery voltage difference": "Паралель: різниця напруг батарей",
+    "Parallel mains voltage difference": "Паралель: різниця напруг мережі",
+    "Parallel mains frequency difference": "Паралель: різниця частот мережі",
+    "Parallel phase loss": "Паралель: втрата фази",
+    "Parallel output sync lost": "Паралель: втрата синхронізації виходу",
+    "BMS fault": "Аварія BMS",
+    "MCU fault": "Аварія мікроконтролера",
+    "Inverter load abnormal": "Аномальне навантаження",
+    "Battery not connected": "Батарею не під'єднано",
+    "Battery undervoltage": "Глибокий розряд батареї",
+    "Battery low voltage": "Низька напруга батареї",
+    "Charger short circuit": "Коротке замикання зарядника",
+    "Battery overcharge": "Перезаряд батареї",
+    "BMS lost": "Втрачено зв'язок з BMS",
+    "Fan stalled": "Зупинився вентилятор",
+    "EEPROM fault": "Помилка пам'яті EEPROM",
+    "Overload": "Перевантаження",
+    "Generator waveform abnormal": "Спотворена напруга генератора",
+    "Weak PV energy": "Слабка генерація PV",
+    "Parallel sync signal lost": "Паралель: втрачено сигнал синхронізації",
+    "Parallel version incompatible": "Паралель: несумісні версії",
+    "Parallel communication error": "Паралель: помилка зв'язку",
+    "Parallel voltage/frequency difference": "Паралель: різниця напруги/частоти",
+    "Low SOC shutdown": "Вимкнення через низький заряд",
+    "Low SOC alarm": "Низький рівень заряду",
+    "Parallel battery difference": "Паралель: різниця батарей",
+    "Battery short circuit": "Коротке замикання батареї",
+    "Battery below starting voltage": "Напруга батареї нижча за пускову",
+    "Generator overload": "Перевантаження генератора",
+    "Generator undervoltage": "Низька напруга генератора",
+    "Generator overvoltage": "Перенапруга генератора",
+    "CT reverse connection": "Трансформатор струму під'єднано навпаки",
+    "Unstable mains power": "Нестабільна мережа",
+}
+
+
+def localize(names: list[str], language: str) -> list[str]:
+    if language.split("-")[0] == "uk":
+        return [UK.get(n, n) for n in names]
+    return names

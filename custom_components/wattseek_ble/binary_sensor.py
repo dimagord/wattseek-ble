@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
 from .registers import decode, REGISTERS
+from .status import ALARM_SPEC, FAULT_SPEC, STATE_ADDR, active_bits
 
 _REG = {r.key: r for r in REGISTERS}
 
@@ -49,11 +50,25 @@ def _battery_charging(data: dict[int, int]) -> bool | None:
     return None if p is None else p < -10
 
 
+def _problem(data: dict[int, int]) -> bool | None:
+    faults = active_bits(data, FAULT_SPEC)
+    alarms = active_bits(data, ALARM_SPEC)
+    if faults is None or alarms is None:
+        return None
+    return bool(faults or alarms) or data.get(STATE_ADDR) == 7
+
+
 BINARY_SENSORS: tuple[WSBinary, ...] = (
     WSBinary(
         key="inverter_online",
         name="Inverter Online",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
+    ),
+    WSBinary(
+        key="problem",
+        translation_key="problem",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        is_on=_problem,
     ),
     WSBinary(
         key="grid_connected",

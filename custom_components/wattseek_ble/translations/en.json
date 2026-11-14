@@ -29,5 +29,41 @@
       }
     }
   },
-  "exceptions": {}
+  "exceptions": {},
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "power_on": "Power on",
+          "initialization": "Initialization",
+          "standby": "Standby",
+          "grid_mode": "Grid mode",
+          "solar_mode": "Solar mode",
+          "battery_mode": "Battery mode",
+          "generator_mode": "Generator mode",
+          "fault": "Fault",
+          "power_off": "Power off",
+          "factory_mode": "Factory mode",
+          "upgrade": "Firmware upgrade"
+        }
+      },
+      "faults": {
+        "name": "Faults"
+      },
+      "alarms": {
+        "name": "Warnings"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Problem"
+      }
+    },
+    "switch": {
+      "remote_power": {
+        "name": "Remote Power"
+      }
+    }
+  }
 }

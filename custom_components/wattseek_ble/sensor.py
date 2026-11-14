@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
 from .registers import REGISTERS, Reg, decode
-from .status import ALARM_SPEC, FAULT_SPEC, STATE_ADDR, STATES, active_bits
+from .status import ALARM_SPEC, FAULT_SPEC, STATE_ADDR, STATE_ICONS, STATES, active_bits, localize
 
 
 async def async_setup_entry(
@@ -29,8 +29,8 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [WattSeekSensor(coordinator, address, reg) for reg in REGISTERS]
     entities += [
         WattSeekStatusSensor(coordinator, address),
-        WattSeekBitsSensor(coordinator, address, "active_faults", "Faults", FAULT_SPEC, "mdi:alert-octagon"),
-        WattSeekBitsSensor(coordinator, address, "active_alarms", "Alarms", ALARM_SPEC, "mdi:alert"),
+        WattSeekBitsSensor(coordinator, address, "active_faults", "faults", FAULT_SPEC, "mdi:alert-octagon"),
+        WattSeekBitsSensor(coordinator, address, "active_alarms", "alarms", ALARM_SPEC, "mdi:alert"),
     ]
     async_add_entities(entities)
 
@@ -48,8 +48,7 @@ class WattSeekStatusSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity)
     """Human-readable inverter state machine."""
 
     _attr_has_entity_name = True
-    _attr_name = "Status"
-    _attr_icon = "mdi:state-machine"
+    _attr_translation_key = "status"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(STATES.values())
 
@@ -63,34 +62,48 @@ class WattSeekStatusSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity)
         raw = (self.coordinator.data or {}).get(STATE_ADDR)
         return STATES.get(raw) if raw is not None else None
 
+    @property
+    def icon(self) -> str:
+        return STATE_ICONS.get(self.native_value or "", "mdi:state-machine")
+
 
 class WattSeekBitsSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
     """Decoded fault/alarm bitfields: 'OK' or a list of active conditions."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, address, key, name, spec, icon) -> None:
+    def __init__(self, coordinator, address, key, translation_key, spec, icon) -> None:
         super().__init__(coordinator)
         self._spec = spec
+        self._problem_icon = icon
         self._attr_unique_id = f"{address}_{key}"
-        self._attr_name = name
-        self._attr_icon = icon
+        self._attr_translation_key = translation_key
         self._attr_device_info = _device_info(address)
 
     def _active(self) -> list[str] | None:
-        return active_bits(self.coordinator.data or {}, self._spec)
+        active = active_bits(self.coordinator.data or {}, self._spec)
+        return None if active is None else localize(active, self.hass.config.language)
 
     @property
     def native_value(self) -> str | None:
         active = self._active()
         if active is None:
             return None
-        return ", ".join(active)[:255] if active else "OK"
+        if not active:
+            return "Немає" if self.hass.config.language.split("-")[0] == "uk" else "None"
+        return ", ".join(active)[:255]
+
+    @property
+    def icon(self) -> str:
+        return self._problem_icon if self._active() else "mdi:check-circle-outline"
 
     @property
     def extra_state_attributes(self) -> dict:
         active = self._active() or []
         return {"count": len(active), "active": active}
+
+
+_RAW_CODES = {"inverter_state", "fault_code", "alarm_code"}
 
 
 class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
@@ -116,6 +129,8 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
             state_class=reg.state_class,
             suggested_display_precision=precision,
             entity_category=EntityCategory.DIAGNOSTIC if reg.diagnostic else None,
+            # Raw state/fault/alarm codes are superseded by the decoded sensors.
+            entity_registry_enabled_default=reg.key not in _RAW_CODES,
         )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, address)},

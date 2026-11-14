@@ -29,5 +29,41 @@
       }
     }
   },
-  "exceptions": {}
+  "exceptions": {},
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Стан",
+        "state": {
+          "power_on": "Увімкнення",
+          "initialization": "Ініціалізація",
+          "standby": "Очікування",
+          "grid_mode": "Від мережі",
+          "solar_mode": "Від сонця",
+          "battery_mode": "Від батареї",
+          "generator_mode": "Від генератора",
+          "fault": "Аварія",
+          "power_off": "Вимкнено",
+          "factory_mode": "Заводський режим",
+          "upgrade": "Оновлення прошивки"
+        }
+      },
+      "faults": {
+        "name": "Аварії"
+      },
+      "alarms": {
+        "name": "Попередження"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Проблема"
+      }
+    },
+    "switch": {
+      "remote_power": {
+        "name": "Живлення інвертора"
+      }
+    }
+  }
 }

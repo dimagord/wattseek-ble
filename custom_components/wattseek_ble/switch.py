@@ -37,7 +37,7 @@ class WattSeekRemotePower(CoordinatorEntity[WattSeekCoordinator], SwitchEntity):
     """Inverter output on/off via the remote power command."""
 
     _attr_has_entity_name = True
-    _attr_name = "Remote Power"
+    _attr_translation_key = "remote_power"
     _attr_icon = "mdi:power"
     _attr_entity_category = EntityCategory.CONFIG
 
