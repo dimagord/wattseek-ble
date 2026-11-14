@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
-from .settings import MODE_UPS, NUMBERS, OPERATING_MODE_ADDR, UPS_RANGES, NumberSetting
+from .settings import MODE_UPS, NUMBERS, ORDER_RULES, OPERATING_MODE_ADDR, UPS_RANGES, NumberSetting
 
 
 async def async_setup_entry(
@@ -77,5 +77,23 @@ class WattSeekNumber(CoordinatorEntity[WattSeekCoordinator], NumberEntity):
             raise ServiceValidationError(
                 f"{self._setting.name}: {value} is outside the allowed range {lo}-{hi}"
             )
+        data = self.coordinator.data or {}
+        by_key = {n.key: n for n in NUMBERS}
+        for lower, upper in ORDER_RULES:
+            if self._setting.key not in (lower, upper):
+                continue
+            other = by_key[upper if self._setting.key == lower else lower]
+            other_raw = data.get(other.address)
+            if other_raw is None:
+                raise ServiceValidationError(
+                    f"{self._setting.name}: current {other.name} is unknown, refusing to write"
+                )
+            other_val = other_raw * other.scale
+            ok = value < other_val if self._setting.key == lower else value > other_val
+            if not ok:
+                rel = "below" if self._setting.key == lower else "above"
+                raise ServiceValidationError(
+                    f"{self._setting.name} must be {rel} {other.name} ({other_val:.1f} {other.unit})"
+                )
         raw = round(value / self._setting.scale)
         await self.coordinator.async_write_setting(self._setting.address, raw)

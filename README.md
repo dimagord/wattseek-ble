@@ -86,7 +86,7 @@ integration is **read-only**.
 
 Writable settings are exposed as `select`/`number` entities (category *Configuration*):
 output priority, operating mode (APP/UPS/GEN), charging priority, AC charging current,
-battery constant-voltage setpoint (48–58.4 V), grid low/high voltage points
+battery voltage setpoints (constant 48–58.4 V, float, switch-to-grid and switch-to-battery voltages, with the manual's ordering rules enforced), grid low/high voltage points
 (ranges follow the input mode, per the inverter manual).
 
 Writing is **off by default**. Enable *Allow changing inverter settings* in the

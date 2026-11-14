@@ -50,7 +50,8 @@ MODE_UPS = 1
 # 20, 22, 23). Deliberately NOT exposed: output voltage/frequency (01/02,
 # risk to connected appliances), battery type (17, changes the whole charge
 # profile), grid-tie feed-in (36/37), factory reset (26) and the unverified
-# 0x412F "max charge power" register (manual program 07 is a current in A).
+# 0x412F register. Note: 0x4118 is program 38 (dual-output cutoff voltage),
+# not the charge voltage as the ESPHome config labelled it.
 SELECTS: tuple[SelectSetting, ...] = (
     SelectSetting(
         "output_priority", "Output Priority", 0x4102,
@@ -65,13 +66,25 @@ SELECTS: tuple[SelectSetting, ...] = (
 )
 
 NUMBERS: tuple[NumberSetting, ...] = (
-    # Program 20: manual allows 48-60 V; capped at 58.4 V (16S LiFePO4 max)
-    # because there is no BMS link to stop an overcharge.
-    NumberSetting("battery_charge_voltage", "Battery Charge Voltage", 0x4118, 48.0, 58.4, 0.1, 0.1, "V"),
-    # Program 22: APP/GEN 90-154 V, UPS 170-200 V (see GRID_LOW_UPS_RANGE).
+    # Battery voltage setpoints (raw = V*10), mapped on a real inverter:
+    # 0x410A = program 20 (CV), 0x410B = 21 (float), 0x410C = 15 (back to
+    # grid), 0x410D = 16 (back to battery). Ranges are the manual's CUS/LIB
+    # ranges, with CV capped at 58.4 V (no BMS link to stop an overcharge).
+    NumberSetting("constant_charge_voltage", "Constant Charge Voltage", 0x410A, 48.0, 58.4, 0.1, 0.1, "V"),
+    NumberSetting("float_charge_voltage", "Float Charge Voltage", 0x410B, 50.0, 58.0, 0.1, 0.1, "V"),
+    NumberSetting("back_to_grid_voltage", "Switch to Grid Voltage", 0x410C, 40.0, 50.0, 0.1, 0.1, "V"),
+    NumberSetting("back_to_battery_voltage", "Switch to Battery Voltage", 0x410D, 46.0, 58.0, 0.1, 0.1, "V"),
+    # Program 22: APP/GEN 90-154 V, UPS 170-200 V (see UPS_RANGES).
     NumberSetting("grid_low_voltage", "Grid Low Voltage", 0x410E, 90.0, 154.0, 1.0, 1.0, "V"),
     # Program 23: APP/GEN 264-280 V; fixed at 264 V in UPS mode.
     NumberSetting("grid_high_voltage", "Grid High Voltage", 0x410F, 264.0, 280.0, 1.0, 1.0, "V"),
+)
+
+# Ordering rules the manual requires: (lower_key, upper_key) -> lower < upper.
+ORDER_RULES: tuple[tuple[str, str], ...] = (
+    ("float_charge_voltage", "constant_charge_voltage"),
+    ("back_to_grid_voltage", "back_to_battery_voltage"),
+    ("back_to_battery_voltage", "constant_charge_voltage"),
 )
 
 # Mode-dependent overrides: key -> (min, max) when operating mode is UPS.
