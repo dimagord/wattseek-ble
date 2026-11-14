@@ -1,7 +1,11 @@
 """Sensor platform for WattSeek BLE."""
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -12,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_ADDRESS, DOMAIN
 from .coordinator import WattSeekCoordinator
 from .registers import REGISTERS, Reg, decode
+from .status import ALARM_SPEC, FAULT_SPEC, STATE_ADDR, STATES, active_bits
 
 
 async def async_setup_entry(
@@ -20,9 +25,72 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: WattSeekCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        WattSeekSensor(coordinator, entry.data[CONF_ADDRESS], reg) for reg in REGISTERS
+    address = entry.data[CONF_ADDRESS]
+    entities: list[SensorEntity] = [WattSeekSensor(coordinator, address, reg) for reg in REGISTERS]
+    entities += [
+        WattSeekStatusSensor(coordinator, address),
+        WattSeekBitsSensor(coordinator, address, "active_faults", "Faults", FAULT_SPEC, "mdi:alert-octagon"),
+        WattSeekBitsSensor(coordinator, address, "active_alarms", "Alarms", ALARM_SPEC, "mdi:alert"),
+    ]
+    async_add_entities(entities)
+
+
+def _device_info(address: str) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, address)},
+        name=f"WattSeek Inverter ({address})",
+        manufacturer="JSD Solar / WattSeek",
+        model="Hybrid Inverter (BLE local)",
     )
+
+
+class WattSeekStatusSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
+    """Human-readable inverter state machine."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Status"
+    _attr_icon = "mdi:state-machine"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(STATES.values())
+
+    def __init__(self, coordinator: WattSeekCoordinator, address: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{address}_status"
+        self._attr_device_info = _device_info(address)
+
+    @property
+    def native_value(self) -> str | None:
+        raw = (self.coordinator.data or {}).get(STATE_ADDR)
+        return STATES.get(raw) if raw is not None else None
+
+
+class WattSeekBitsSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
+    """Decoded fault/alarm bitfields: 'OK' or a list of active conditions."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, address, key, name, spec, icon) -> None:
+        super().__init__(coordinator)
+        self._spec = spec
+        self._attr_unique_id = f"{address}_{key}"
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_device_info = _device_info(address)
+
+    def _active(self) -> list[str] | None:
+        return active_bits(self.coordinator.data or {}, self._spec)
+
+    @property
+    def native_value(self) -> str | None:
+        active = self._active()
+        if active is None:
+            return None
+        return ", ".join(active)[:255] if active else "OK"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        active = self._active() or []
+        return {"count": len(active), "active": active}
 
 
 class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):

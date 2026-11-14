@@ -93,5 +93,9 @@ Writing is **off by default**. Enable *Allow changing inverter settings* in the
 integration options once you have checked that the values shown match the inverter
 display/app.
 
+A **Remote Power** switch (register 0x4123) turns the inverter output on/off — everything fed from the inverter loses power when it is off. It obeys the same write lock.
+
+Decoded diagnostics: **Status** (Grid mode, Battery mode, Standby, Fault …), **Faults** and **Alarms** (`OK` or the list of active conditions).
+
 Deliberately not exposed: output voltage/frequency, battery type, grid-tie feed-in,
 factory reset.
