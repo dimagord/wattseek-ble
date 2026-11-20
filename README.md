@@ -103,6 +103,12 @@ Copy `custom_components/wattseek_ble/` into `config/custom_components/` and rest
 | Warnings | `None` or the list of active warnings (battery low, BMS lost, fan stalled …) |
 | Problem | `on` when any fault or warning is active — handy for notifications |
 | Inverter online | BLE link health |
+| Response time / Response time max | Request → response round trip over BLE (ms): mean and slowest request of the last poll |
+| Poll duration | Whole poll including any reconnect (ms) |
+| Connect time | Last BLE connect + handshake (ms) |
+| Write response time | Round trip of the last settings write (ms) |
+| Last response | When the logger last answered |
+| Request errors | Requests that timed out or failed since HA started |
 
 Raw state/fault/alarm codes are available as disabled-by-default diagnostic sensors.
 
