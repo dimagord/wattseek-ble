@@ -20,34 +20,47 @@ from .settings import SETTINGS_BLOCKS
 
 _LOGGER = logging.getLogger(__name__)
 
-# One Modbus read returns at most 125 registers (the response byte count is a
-# single byte), so merged spans are capped there.
-MAX_SPAN = 125
+# Each logger round trip costs ~0.5 s regardless of size, so nearby blocks are
+# read as one Modbus request. Not every span works: the inverter rejects a read
+# that crosses unmapped addresses, so these are the spans verified on hardware.
+# Live data, read every poll:
+FAST_SPANS: tuple[tuple[int, int], ...] = (
+    (0x0042, 0x5C),  # state/fault/alarm + grid/load + battery/BMS + PV1/PV2
+    (0x0218, 0x10),  # output
+    (0x0260, 0x0F),  # PV totals
+)
+# Slowly changing data (counters, temperatures, settings), read every
+# SLOW_EVERY seconds and right after a settings write. Blocks not covered by
+# any span are read on their own in the slow pass.
+SLOW_SPANS: tuple[tuple[int, int], ...] = (
+    (0x4100, 0x44),  # all settings blocks
+)
+SLOW_EVERY = 60.0
 # A merged span that fails this many times in a row while its own blocks read
 # fine is abandoned until the integration reloads.
 SPAN_GIVE_UP = 3
 
+Plan = list[tuple[tuple[int, int], list[tuple[int, int]]]]
 
-def merge_blocks(
-    blocks: tuple[tuple[int, int], ...], max_span: int = MAX_SPAN
-) -> list[tuple[tuple[int, int], list[tuple[int, int]]]]:
-    """Group register blocks into as few reads as possible.
 
-    Returns (span, original blocks) pairs. Each request costs ~0.5 s of logger
-    round trip regardless of size, so reading the gaps between nearby blocks
-    is far cheaper than an extra request.
-    """
-    plan: list[tuple[tuple[int, int], list[tuple[int, int]]]] = []
-    for start, count in sorted(blocks):
-        if plan:
-            (s_start, _), members = plan[-1]
-            end = max(start + count, max(b + c for b, c in members))
-            if end - s_start <= max_span:
-                members.append((start, count))
-                plan[-1] = ((s_start, end - s_start), members)
-                continue
-        plan.append(((start, count), [(start, count)]))
-    return plan
+def build_plans(blocks: tuple[tuple[int, int], ...]) -> tuple[Plan, Plan]:
+    """Assign every register block to a fast or slow (span, members) read."""
+    def inside(span, block):
+        return span[0] <= block[0] and block[0] + block[1] <= span[0] + span[1]
+
+    remaining = sorted(set(blocks))
+    plans: list[Plan] = []
+    for spans in (FAST_SPANS, SLOW_SPANS):
+        plan: Plan = []
+        for span in spans:
+            members = [b for b in remaining if inside(span, b)]
+            if members:
+                plan.append((span, members))
+                remaining = [b for b in remaining if b not in members]
+        plans.append(plan)
+    fast, slow = plans
+    slow += [(b, [b]) for b in remaining]
+    return fast, slow
 
 
 class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
@@ -63,8 +76,10 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         )
         self.entry = entry
         self.device = device
-        self._plan = merge_blocks((*READ_BLOCKS, *SETTINGS_BLOCKS))
+        self._fast_plan, self._slow_plan = build_plans((*READ_BLOCKS, *SETTINGS_BLOCKS))
         self._span_failures: dict[tuple[int, int], int] = {}
+        self._last_slow = 0.0
+        self._force_slow = True
         # Link-quality diagnostics, refreshed every poll (see sensor.py).
         self.timing: dict[str, Any] = {
             "response_time": None,      # mean request->response RTT this poll, ms
@@ -111,8 +126,10 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             self._record_timing(started)
             raise UpdateFailed(str(err)) from err
 
+        slow = self._force_slow or time.monotonic() - self._last_slow >= SLOW_EVERY
+        plan = self._fast_plan + (self._slow_plan if slow else [])
         failures = 0
-        for span, members in self._plan:
+        for span, members in plan:
             if len(members) > 1 and self._span_failures.get(span, 0) < SPAN_GIVE_UP:
                 regs = await self._read(*span)
                 if regs is not None:
@@ -128,8 +145,8 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 ok += 1
                 words.update({start + i: v for i, v in enumerate(regs)})
             if len(members) > 1 and ok == len(members):
-                # The merged read failed but the pieces work: the logger or
-                # inverter probably rejects this span.
+                # The merged read failed but the pieces work: the inverter
+                # probably rejects this span.
                 n = self._span_failures.get(span, 0) + 1
                 self._span_failures[span] = n
                 if n == SPAN_GIVE_UP:
@@ -137,6 +154,9 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
                         "merged read %#06x+%d keeps failing; reading its %d blocks separately",
                         span[0], span[1], len(members),
                     )
+        if slow and words:
+            self._last_slow = time.monotonic()
+            self._force_slow = False
 
         self._record_timing(started)
         if not words:
@@ -145,7 +165,8 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             raise UpdateFailed("no register blocks could be read")
         if failures:
             _LOGGER.debug("%d register block(s) failed this cycle", failures)
-        return words
+        # Keep the slow registers from earlier polls; fresh reads win.
+        return {**(self.data or {}), **words}
 
     async def _read(self, start: int, count: int) -> list[int] | None:
         try:
@@ -174,6 +195,7 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         if self.device.last_rtt is not None:
             self.timing["write_response_time"] = round(self.device.last_rtt * 1000)
             self.timing["last_response"] = dt_util.utcnow()
+        self._force_slow = True  # re-read settings on the refresh below
         if self.data is not None:
             self.data[addr] = value & 0xFFFF
             self.async_update_listeners()

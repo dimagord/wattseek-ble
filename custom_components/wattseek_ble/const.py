@@ -52,5 +52,5 @@ CONF_ADDRESS: Final = "address"
 CONF_UPDATE_INTERVAL: Final = "update_interval"
 CONF_ALLOW_WRITES: Final = "allow_writes"
 DEFAULT_UPDATE_INTERVAL: Final = 30
-MIN_UPDATE_INTERVAL: Final = 5
+MIN_UPDATE_INTERVAL: Final = 1
 MAX_UPDATE_INTERVAL: Final = 600

@@ -72,7 +72,7 @@ Copy `custom_components/wattseek_ble/` into `config/custom_components/` and rest
 
 | Option | Default | Description |
 |---|---|---|
-| Update interval | 30 s | How often the inverter is polled (5–600 s). |
+| Update interval | 30 s | Pause between polls (1–600 s). Live data (power, voltages, SOC) is read every poll; counters, temperatures and settings once a minute. |
 | Allow changing inverter settings | off | Unlocks all writable entities. Leave it off until you've checked that the values shown match your inverter's display. |
 
 ## Entities
