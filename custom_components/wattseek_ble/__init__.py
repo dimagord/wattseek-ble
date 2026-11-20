@@ -36,6 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Cancelled automatically when the entry unloads.
+    entry.async_create_background_task(
+        hass, coordinator.async_grid_watch(), f"{DOMAIN} grid watch {address}"
+    )
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 

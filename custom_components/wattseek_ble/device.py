@@ -54,6 +54,10 @@ class WattSeekBLEDevice:
         self.rtts = []
 
     @property
+    def connected(self) -> bool:
+        return bool(self._connected and self._client and self._client.is_connected)
+
+    @property
     def address(self) -> str:
         return self._ble_device.address
 

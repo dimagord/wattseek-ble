@@ -1,6 +1,7 @@
 """DataUpdateCoordinator for WattSeek BLE."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -36,6 +37,18 @@ SLOW_SPANS: tuple[tuple[int, int], ...] = (
     (0x4100, 0x44),  # all settings blocks
 )
 SLOW_EVERY = 60.0
+# Between polls, re-read just the grid registers this often so that a mains
+# outage (or its return) reaches HA within about a second.
+GRID_WATCH_EVERY = 1.0
+GRID_BLOCK = (0x0050, 4)  # grid voltage, current, frequency, power
+GRID_VOLTAGE_ADDR = 0x0050
+GRID_PRESENT_RAW = 500  # 50.0 V at 0.1 V/LSB, same threshold as binary_sensor
+
+
+def grid_present(data: dict[int, int] | None) -> bool | None:
+    if not data or GRID_VOLTAGE_ADDR not in data:
+        return None
+    return data[GRID_VOLTAGE_ADDR] > GRID_PRESENT_RAW
 # A merged span that fails this many times in a row while its own blocks read
 # fine is abandoned until the integration reloads.
 SPAN_GIVE_UP = 3
@@ -80,6 +93,7 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._span_failures: dict[tuple[int, int], int] = {}
         self._last_slow = 0.0
         self._force_slow = True
+        self._polling = False
         # Link-quality diagnostics, refreshed every poll (see sensor.py).
         self.timing: dict[str, Any] = {
             "response_time": None,      # mean request->response RTT this poll, ms
@@ -112,6 +126,33 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             self.device.set_ble_device(ble_device)
 
     async def _async_update_data(self) -> dict[int, int]:
+        self._polling = True
+        try:
+            return await self._poll()
+        finally:
+            self._polling = False
+
+    async def async_grid_watch(self) -> None:
+        """Quick grid-only reads between polls; push only on grid loss/return."""
+        while True:
+            await asyncio.sleep(GRID_WATCH_EVERY)
+            if self._polling or self.data is None or not self.device.connected:
+                continue
+            try:
+                regs = await self._read(*GRID_BLOCK)
+            except Exception:  # noqa: BLE001 - never let the watcher die
+                _LOGGER.debug("grid watch read failed", exc_info=True)
+                continue
+            if regs is None or self._polling or self.data is None:
+                continue
+            before = grid_present(self.data)
+            self.data.update({GRID_BLOCK[0] + i: v for i, v in enumerate(regs)})
+            after = grid_present(self.data)
+            if after != before:
+                _LOGGER.debug("grid %s (watch)", "back" if after else "lost")
+                self.async_update_listeners()
+
+    async def _poll(self) -> dict[int, int]:
         self._refresh_ble_device()
         words: dict[int, int] = {}
         started = time.monotonic()
