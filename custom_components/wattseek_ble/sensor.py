@@ -7,7 +7,8 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
+from homeassistant.components.sensor import SensorStateClass
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -33,6 +34,8 @@ async def async_setup_entry(
         WattSeekBitsSensor(coordinator, address, "active_faults", "faults", FAULT_SPEC, "mdi:alert-octagon"),
         WattSeekBitsSensor(coordinator, address, "active_alarms", "alarms", ALARM_SPEC, "mdi:alert"),
     ]
+    entities += [WattSeekTimingSensor(coordinator, address, d) for d in TIMING_SENSORS]
+    entities.append(WattSeekRequestErrorsSensor(coordinator, address))
     async_add_entities(entities)
 
 
@@ -176,3 +179,76 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
             and self.coordinator.data is not None
             and self.native_value is not None
         )
+
+
+def _ms(key: str, icon: str) -> SensorEntityDescription:
+    return SensorEntityDescription(
+        key=key,
+        translation_key=key,
+        icon=icon,
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+
+TIMING_SENSORS: tuple[SensorEntityDescription, ...] = (
+    _ms("response_time", "mdi:timer-sync-outline"),
+    _ms("response_time_max", "mdi:timer-alert-outline"),
+    _ms("poll_duration", "mdi:timer-outline"),
+    _ms("connect_time", "mdi:bluetooth-connect"),
+    _ms("write_response_time", "mdi:timer-edit-outline"),
+    SensorEntityDescription(
+        key="last_response",
+        translation_key="last_response",
+        icon="mdi:clock-check-outline",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
+class WattSeekTimingSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
+    """BLE link timing: how fast the logger answers our requests."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: WattSeekCoordinator, address: str, description: SensorEntityDescription) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{address}_{description.key}"
+        self._attr_device_info = _device_info(address)
+
+    @property
+    def native_value(self):
+        return self.coordinator.timing.get(self.entity_description.key)
+
+    @property
+    def available(self) -> bool:
+        # Stay available after a failed poll so slow/failed cycles stay visible.
+        return self.native_value is not None
+
+
+class WattSeekRequestErrorsSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
+    """Requests that timed out or failed since HA started."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "request_errors"
+    _attr_icon = "mdi:bluetooth-off"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: WattSeekCoordinator, address: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{address}_request_errors"
+        self._attr_device_info = _device_info(address)
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.request_errors
+
+    @property
+    def available(self) -> bool:
+        return True

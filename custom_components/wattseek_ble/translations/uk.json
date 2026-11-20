@@ -62,6 +62,27 @@
           "float": "Підтримувальний (float)",
           "equalize": "Вирівнювальний"
         }
+      },
+      "response_time": {
+        "name": "Час відповіді"
+      },
+      "response_time_max": {
+        "name": "Час відповіді (макс.)"
+      },
+      "poll_duration": {
+        "name": "Тривалість опитування"
+      },
+      "connect_time": {
+        "name": "Час підключення"
+      },
+      "write_response_time": {
+        "name": "Час відповіді на запис"
+      },
+      "last_response": {
+        "name": "Остання відповідь"
+      },
+      "request_errors": {
+        "name": "Помилки запитів"
       }
     },
     "binary_sensor": {

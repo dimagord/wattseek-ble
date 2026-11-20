@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
@@ -43,6 +44,14 @@ class WattSeekBLEDevice:
         self._expected = 0
         self._future: asyncio.Future[Frame] | None = None
         self._connected = False
+        # Round-trip time (s) of each successful command since the last
+        # reset_timing(): from the GATT write until the matching response frame.
+        self.rtts: list[float] = []
+        self.last_rtt: float | None = None
+        self.request_errors = 0
+
+    def reset_timing(self) -> None:
+        self.rtts = []
 
     @property
     def address(self) -> str:
@@ -53,9 +62,10 @@ class WattSeekBLEDevice:
         self._ble_device = ble_device
 
     # -- connection --------------------------------------------------------
-    async def connect(self) -> None:
+    async def connect(self) -> bool:
+        """Connect if needed. Returns True when a new connection was made."""
         if self._connected and self._client and self._client.is_connected:
-            return
+            return False
         _LOGGER.debug("connecting to %s", self.address)
         client = await establish_connection(
             BleakClientWithServiceCache,
@@ -71,6 +81,7 @@ class WattSeekBLEDevice:
         await self._handshake()
         self._connected = True
         _LOGGER.debug("connected and handshaked with %s", self.address)
+        return True
 
     def _on_disconnect(self, _client) -> None:
         _LOGGER.debug("disconnected from %s", self.address)
@@ -133,11 +144,23 @@ class WattSeekBLEDevice:
             self._expect_fc = expect_fc
             self._buffer.clear()
             _LOGGER.debug("write -> %s", frame_bytes.hex())
+            started = time.monotonic()
             try:
                 await self._client.write_gatt_char(CHAR_UUID, frame_bytes, response=True)
-                return await asyncio.wait_for(self._future, timeout)
+                frame = await asyncio.wait_for(self._future, timeout)
             except (BleakError, asyncio.TimeoutError) as err:
+                self.request_errors += 1
                 raise WattSeekBLEError(f"command failed: {err!r}") from err
+            except WattSeekBLEError:
+                # Set on the future by _on_disconnect mid-request.
+                self.request_errors += 1
+                raise
+            else:
+                rtt = time.monotonic() - started
+                self.last_rtt = rtt
+                self.rtts.append(rtt)
+                _LOGGER.debug("response in %.0f ms", rtt * 1000)
+                return frame
             finally:
                 self._future = None
                 self._expect_fc = None

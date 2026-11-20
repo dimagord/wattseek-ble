@@ -62,6 +62,27 @@
           "float": "Float",
           "equalize": "Equalize"
         }
+      },
+      "response_time": {
+        "name": "Response Time"
+      },
+      "response_time_max": {
+        "name": "Response Time Max"
+      },
+      "poll_duration": {
+        "name": "Poll Duration"
+      },
+      "connect_time": {
+        "name": "Connect Time"
+      },
+      "write_response_time": {
+        "name": "Write Response Time"
+      },
+      "last_response": {
+        "name": "Last Response"
+      },
+      "request_errors": {
+        "name": "Request Errors"
       }
     },
     "binary_sensor": {
