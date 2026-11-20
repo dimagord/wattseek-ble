@@ -132,6 +132,45 @@ class WattSeekBitsSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
 
 _RAW_CODES = {"inverter_state", "fault_code", "alarm_code"}
 
+# Energy counters can only creep up (a few hundredths of a kWh per poll) or
+# roll over to ~0 at the start of a day/month/year. Anything else is a bad
+# read; HA statistics would book a drop as a meter reset and add the whole
+# counter to the day. A changed value is accepted once it repeats this many
+# polls in a row (e.g. after a long gap).
+ENERGY_MAX_STEP = 5.0  # kWh between two accepted readings
+ENERGY_ROLLOVER_MAX = 5.0  # a period counter may drop to below this
+ENERGY_CONFIRM = 3
+
+
+class EnergyGuard:
+    """Rejects implausible jumps in an energy counter."""
+
+    def __init__(self, can_roll_over: bool) -> None:
+        self._roll = can_roll_over
+        self._last: float | None = None
+        self._pending: float | None = None
+        self._seen = 0
+
+    def __call__(self, value: float | None) -> float | None:
+        if value is None:
+            return self._last
+        last = self._last
+        delta = None if last is None else value - last
+        plausible = (
+            last is None
+            or 0 <= delta <= ENERGY_MAX_STEP
+            or (self._roll and delta < 0 and value < ENERGY_ROLLOVER_MAX)
+        )
+        if not plausible:
+            if self._pending == value:
+                self._seen += 1
+            else:
+                self._pending, self._seen = value, 1
+            if self._seen < ENERGY_CONFIRM:
+                return last
+        self._last, self._pending, self._seen = value, None, 0
+        return value
+
 
 class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
     """A single inverter register exposed as a sensor."""
@@ -165,12 +204,26 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
             manufacturer="JSD Solar / WattSeek",
             model="Hybrid Inverter (BLE local)",
         )
+        self._guard = (
+            EnergyGuard(can_roll_over=not reg.key.endswith("_total"))
+            if reg.device_class == SensorDeviceClass.ENERGY
+            else None
+        )
+        self._value = self._read()
+
+    def _read(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        value = decode(self._reg, self.coordinator.data)
+        return self._guard(value) if self._guard else value
+
+    def _handle_coordinator_update(self) -> None:
+        self._value = self._read()
+        super()._handle_coordinator_update()
 
     @property
     def native_value(self) -> float | None:
-        if self.coordinator.data is None:
-            return None
-        return decode(self._reg, self.coordinator.data)
+        return self._value
 
     @property
     def available(self) -> bool:

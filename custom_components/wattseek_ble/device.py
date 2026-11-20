@@ -25,6 +25,12 @@ from .protocol import (
 _LOGGER = logging.getLogger(__name__)
 
 COMMAND_TIMEOUT = 8.0
+# After a timed-out request the logger may still answer it. Responses carry no
+# request id, so a late answer would be taken for the next request's (same
+# function code, often the same length) and its registers mapped onto the
+# wrong addresses. Wait this long before the next request so a late frame
+# arrives while nothing is pending and gets dropped.
+LATE_RESPONSE_GRACE = 2.0
 HANDSHAKE_TIMEOUT = 10.0
 
 
@@ -49,6 +55,8 @@ class WattSeekBLEDevice:
         self.rtts: list[float] = []
         self.last_rtt: float | None = None
         self.request_errors = 0
+        self._expect_fc: int | None = None
+        self._stale = False
 
     def reset_timing(self) -> None:
         self.rtts = []
@@ -78,6 +86,7 @@ class WattSeekBLEDevice:
             disconnected_callback=self._on_disconnect,
         )
         self._client = client
+        self._stale = False
         self._buffer.clear()
         self._expected = 0
         await client.start_notify(CHAR_UUID, self._on_notify)
@@ -143,6 +152,9 @@ class WattSeekBLEDevice:
         if not self._client or not self._client.is_connected:
             raise WattSeekBLEError("not connected")
         async with self._lock:
+            if self._stale:
+                await asyncio.sleep(LATE_RESPONSE_GRACE)
+                self._stale = False
             loop = asyncio.get_running_loop()
             self._future = loop.create_future()
             self._expect_fc = expect_fc
@@ -154,6 +166,7 @@ class WattSeekBLEDevice:
                 frame = await asyncio.wait_for(self._future, timeout)
             except (BleakError, asyncio.TimeoutError) as err:
                 self.request_errors += 1
+                self._stale = True
                 raise WattSeekBLEError(f"command failed: {err!r}") from err
             except WattSeekBLEError:
                 # Set on the future by _on_disconnect mid-request.
