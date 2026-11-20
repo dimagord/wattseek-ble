@@ -20,6 +20,35 @@ from .settings import SETTINGS_BLOCKS
 
 _LOGGER = logging.getLogger(__name__)
 
+# One Modbus read returns at most 125 registers (the response byte count is a
+# single byte), so merged spans are capped there.
+MAX_SPAN = 125
+# A merged span that fails this many times in a row while its own blocks read
+# fine is abandoned until the integration reloads.
+SPAN_GIVE_UP = 3
+
+
+def merge_blocks(
+    blocks: tuple[tuple[int, int], ...], max_span: int = MAX_SPAN
+) -> list[tuple[tuple[int, int], list[tuple[int, int]]]]:
+    """Group register blocks into as few reads as possible.
+
+    Returns (span, original blocks) pairs. Each request costs ~0.5 s of logger
+    round trip regardless of size, so reading the gaps between nearby blocks
+    is far cheaper than an extra request.
+    """
+    plan: list[tuple[tuple[int, int], list[tuple[int, int]]]] = []
+    for start, count in sorted(blocks):
+        if plan:
+            (s_start, _), members = plan[-1]
+            end = max(start + count, max(b + c for b, c in members))
+            if end - s_start <= max_span:
+                members.append((start, count))
+                plan[-1] = ((s_start, end - s_start), members)
+                continue
+        plan.append(((start, count), [(start, count)]))
+    return plan
+
 
 class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
     """Polls the inverter registers over BLE on a configurable interval."""
@@ -34,6 +63,8 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         )
         self.entry = entry
         self.device = device
+        self._plan = merge_blocks((*READ_BLOCKS, *SETTINGS_BLOCKS))
+        self._span_failures: dict[tuple[int, int], int] = {}
         # Link-quality diagnostics, refreshed every poll (see sensor.py).
         self.timing: dict[str, Any] = {
             "response_time": None,      # mean request->response RTT this poll, ms
@@ -81,15 +112,31 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             raise UpdateFailed(str(err)) from err
 
         failures = 0
-        for start, count in (*READ_BLOCKS, *SETTINGS_BLOCKS):
-            try:
-                regs = await self.device.async_read_registers(start, count)
-            except WattSeekBLEError as err:
-                failures += 1
-                _LOGGER.debug("block %#06x+%d failed: %s", start, count, err)
-                continue
-            for i, value in enumerate(regs):
-                words[start + i] = value
+        for span, members in self._plan:
+            if len(members) > 1 and self._span_failures.get(span, 0) < SPAN_GIVE_UP:
+                regs = await self._read(*span)
+                if regs is not None:
+                    self._span_failures[span] = 0
+                    words.update({span[0] + i: v for i, v in enumerate(regs)})
+                    continue
+            ok = 0
+            for start, count in members:
+                regs = await self._read(start, count)
+                if regs is None:
+                    failures += 1
+                    continue
+                ok += 1
+                words.update({start + i: v for i, v in enumerate(regs)})
+            if len(members) > 1 and ok == len(members):
+                # The merged read failed but the pieces work: the logger or
+                # inverter probably rejects this span.
+                n = self._span_failures.get(span, 0) + 1
+                self._span_failures[span] = n
+                if n == SPAN_GIVE_UP:
+                    _LOGGER.info(
+                        "merged read %#06x+%d keeps failing; reading its %d blocks separately",
+                        span[0], span[1], len(members),
+                    )
 
         self._record_timing(started)
         if not words:
@@ -99,6 +146,17 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         if failures:
             _LOGGER.debug("%d register block(s) failed this cycle", failures)
         return words
+
+    async def _read(self, start: int, count: int) -> list[int] | None:
+        try:
+            regs = await self.device.async_read_registers(start, count)
+        except WattSeekBLEError as err:
+            _LOGGER.debug("read %#06x+%d failed: %s", start, count, err)
+            return None
+        if len(regs) != count:
+            _LOGGER.debug("read %#06x+%d returned %d registers", start, count, len(regs))
+            return None
+        return regs
 
     async def async_write_setting(self, addr: int, value: int) -> None:
         """Write one settings register, then refresh."""
