@@ -79,22 +79,47 @@ class WattSeekBLEDevice:
         if self._connected and self._client and self._client.is_connected:
             return False
         _LOGGER.debug("connecting to %s", self.address)
-        client = await establish_connection(
-            BleakClientWithServiceCache,
-            self._ble_device,
-            self._ble_device.name or self.address,
-            disconnected_callback=self._on_disconnect,
-        )
-        self._client = client
+        client = await self._establish(use_services_cache=True)
         self._stale = False
         self._buffer.clear()
         self._expected = 0
-        await client.start_notify(CHAR_UUID, self._on_notify)
+        try:
+            await client.start_notify(CHAR_UUID, self._on_notify)
+        except BleakError as err:
+            # Seen after the logger reboots: BlueZ keeps a stale GATT database
+            # for the device, the connection succeeds but the characteristic
+            # object is gone ("StartNotify ... doesn't exist"). Every retry
+            # then fails the same way until the cache is dropped.
+            _LOGGER.warning(
+                "subscribing to %s failed (%s); clearing the cached GATT services and reconnecting",
+                self.address, err,
+            )
+            try:
+                await client.clear_cache()
+            except Exception as clear_err:  # noqa: BLE001 - best effort
+                _LOGGER.debug("clear_cache failed: %s", clear_err)
+            try:
+                await client.disconnect()
+            except Exception:  # noqa: BLE001 - best effort
+                pass
+            client = await self._establish(use_services_cache=False)
+            await client.start_notify(CHAR_UUID, self._on_notify)
         self._session = AppSession()
         await self._handshake()
         self._connected = True
         _LOGGER.debug("connected and handshaked with %s", self.address)
         return True
+
+    async def _establish(self, use_services_cache: bool) -> BleakClientWithServiceCache:
+        client = await establish_connection(
+            BleakClientWithServiceCache,
+            self._ble_device,
+            self._ble_device.name or self.address,
+            disconnected_callback=self._on_disconnect,
+            use_services_cache=use_services_cache,
+        )
+        self._client = client
+        return client
 
     def _on_disconnect(self, _client) -> None:
         _LOGGER.debug("disconnected from %s", self.address)
