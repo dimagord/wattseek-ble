@@ -212,7 +212,10 @@ class WattSeekBLEDevice:
         try:
             await self._command(frame, expect_fc=0x18, timeout=HANDSHAKE_TIMEOUT)
         except WattSeekBLEError as err:
-            _LOGGER.warning("handshake did not complete cleanly: %s", err)
+            # The logger does not seem to answer this on every connect, and the
+            # register reads that follow work regardless, so this is not worth
+            # a warning on each reconnect.
+            _LOGGER.debug("handshake did not complete cleanly: %s", err)
 
     # -- high level --------------------------------------------------------
     async def async_query(self, param_code: int) -> bytes:

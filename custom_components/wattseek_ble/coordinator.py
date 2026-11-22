@@ -7,6 +7,7 @@ import time
 from datetime import timedelta
 from typing import Any
 
+from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -52,6 +53,11 @@ def grid_present(data: dict[int, int] | None) -> bool | None:
 # A merged span that fails this many times in a row while its own blocks read
 # fine is abandoned until the integration reloads.
 SPAN_GIVE_UP = 3
+# The BLE link to the logger drops every few minutes (one request times out,
+# then the connection is gone). Reconnecting takes ~10-15 s, so a failed poll
+# keeps serving the last good data for this long before entities go
+# unavailable; a genuinely lost inverter still shows up after STALE_AFTER.
+STALE_AFTER = 30.0
 
 Plan = list[tuple[tuple[int, int], list[tuple[int, int]]]]
 
@@ -94,6 +100,7 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._last_slow = 0.0
         self._force_slow = True
         self._polling = False
+        self._last_success: float | None = None
         # Link-quality diagnostics, refreshed every poll (see sensor.py).
         self.timing: dict[str, Any] = {
             "response_time": None,      # mean request->response RTT this poll, ms
@@ -153,24 +160,56 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
                 self.async_update_listeners()
 
     async def _poll(self) -> dict[int, int]:
-        self._refresh_ble_device()
-        words: dict[int, int] = {}
         started = time.monotonic()
         self.device.reset_timing()
         try:
-            if await self.device.connect():
-                self.timing["connect_time"] = round((time.monotonic() - started) * 1000)
-                # Keep the handshake out of the per-request response times.
-                self.device.reset_timing()
-        except WattSeekBLEError as err:
+            words = await self._poll_once(started)
+            if not words:
+                # Usually the link has just dropped. Reconnect and retry right
+                # away instead of waiting for the next poll.
+                _LOGGER.debug("nothing read; reconnecting and retrying")
+                await self.device.disconnect()
+                words = await self._poll_once(started)
+        except (WattSeekBLEError, BleakError, asyncio.TimeoutError) as err:
             await self.device.disconnect()
             self._record_timing(started)
-            raise UpdateFailed(str(err)) from err
+            return self._failed(str(err) or repr(err))
 
+        self._record_timing(started)
+        if not words:
+            # Drop a possibly wedged link so the logger starts advertising again.
+            await self.device.disconnect()
+            return self._failed("no register blocks could be read")
+        self._last_success = time.monotonic()
+        # Keep the slow registers from earlier polls; fresh reads win.
+        return {**(self.data or {}), **words}
+
+    def _failed(self, reason: str) -> dict[int, int]:
+        """Ride out a short outage on the last data; give up after STALE_AFTER."""
+        if (
+            self.data is not None
+            and self._last_success is not None
+            and time.monotonic() - self._last_success < STALE_AFTER
+        ):
+            _LOGGER.debug("poll failed (%s); keeping last data", reason)
+            return self.data
+        raise UpdateFailed(reason)
+
+    async def _poll_once(self, started: float) -> dict[int, int]:
+        """Connect if needed and run one read plan. Returns what was read."""
+        self._refresh_ble_device()
+        if await self.device.connect():
+            self.timing["connect_time"] = round((time.monotonic() - started) * 1000)
+            # Keep the handshake out of the per-request response times.
+            self.device.reset_timing()
+
+        words: dict[int, int] = {}
         slow = self._force_slow or time.monotonic() - self._last_slow >= SLOW_EVERY
         plan = self._fast_plan + (self._slow_plan if slow else [])
         failures = 0
         for span, members in plan:
+            if not self.device.connected:
+                break  # link dropped mid-poll; let the caller reconnect
             if len(members) > 1 and self._span_failures.get(span, 0) < SPAN_GIVE_UP:
                 regs = await self._read(*span)
                 if regs is not None:
@@ -198,16 +237,9 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         if slow and words:
             self._last_slow = time.monotonic()
             self._force_slow = False
-
-        self._record_timing(started)
-        if not words:
-            # Drop a possibly wedged link so the logger starts advertising again.
-            await self.device.disconnect()
-            raise UpdateFailed("no register blocks could be read")
         if failures:
             _LOGGER.debug("%d register block(s) failed this cycle", failures)
-        # Keep the slow registers from earlier polls; fresh reads win.
-        return {**(self.data or {}), **words}
+        return words
 
     async def _read(self, start: int, count: int) -> list[int] | None:
         try:
