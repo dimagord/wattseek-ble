@@ -101,6 +101,10 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
         self._force_slow = True
         self._polling = False
         self._last_success: float | None = None
+        # Addresses actually read by the latest update. Slow registers are
+        # carried over between polls, so an entity must not treat a carried
+        # value as a new reading (see EnergyGuard in sensor.py).
+        self.fresh: frozenset[int] = frozenset()
         # Link-quality diagnostics, refreshed every poll (see sensor.py).
         self.timing: dict[str, Any] = {
             "response_time": None,      # mean request->response RTT this poll, ms
@@ -181,6 +185,7 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             await self.device.disconnect()
             return self._failed("no register blocks could be read")
         self._last_success = time.monotonic()
+        self.fresh = frozenset(words)
         # Keep the slow registers from earlier polls; fresh reads win.
         return {**(self.data or {}), **words}
 
@@ -192,6 +197,7 @@ class WattSeekCoordinator(DataUpdateCoordinator[dict[int, int]]):
             and time.monotonic() - self._last_success < STALE_AFTER
         ):
             _LOGGER.debug("poll failed (%s); keeping last data", reason)
+            self.fresh = frozenset()
             return self.data
         raise UpdateFailed(reason)
 

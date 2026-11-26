@@ -135,8 +135,10 @@ _RAW_CODES = {"inverter_state", "fault_code", "alarm_code"}
 # Energy counters can only creep up (a few hundredths of a kWh per poll) or
 # roll over to ~0 at the start of a day/month/year. Anything else is a bad
 # read; HA statistics would book a drop as a meter reset and add the whole
-# counter to the day. A changed value is accepted once it repeats this many
-# polls in a row (e.g. after a long gap).
+# counter to the day. A changed value is accepted once it is read back this
+# many times in a row (e.g. after a long gap). Only fresh reads count: the
+# counters are re-read once a minute but entities update every poll, so a
+# carried-over bad value must not confirm itself.
 ENERGY_MAX_STEP = 5.0  # kWh between two accepted readings
 ENERGY_ROLLOVER_MAX = 5.0  # a period counter may drop to below this
 ENERGY_CONFIRM = 3
@@ -151,8 +153,10 @@ class EnergyGuard:
         self._pending: float | None = None
         self._seen = 0
 
-    def __call__(self, value: float | None) -> float | None:
+    def __call__(self, value: float | None, fresh: bool = True) -> float | None:
         if value is None:
+            return self._last
+        if not fresh and self._last is not None:
             return self._last
         last = self._last
         delta = None if last is None else value - last
@@ -215,7 +219,9 @@ class WattSeekSensor(CoordinatorEntity[WattSeekCoordinator], SensorEntity):
         if self.coordinator.data is None:
             return None
         value = decode(self._reg, self.coordinator.data)
-        return self._guard(value) if self._guard else value
+        if self._guard is None:
+            return value
+        return self._guard(value, self._reg.address in self.coordinator.fresh)
 
     def _handle_coordinator_update(self) -> None:
         self._value = self._read()
